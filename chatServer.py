@@ -1,16 +1,13 @@
 import socket, sys, select, os
 
-def chatDisplayMsg(username, msg):
-	return "<%s> %s " %(username,msg)
-
 #distribute an incoming message to all clients except the sender sock and serverSocket
 #if a client refuses the message, close the client
 def distributeMsg(sendSocket,msg):
 	for client in clients:
 			if client != sendSocket and client != serverSocket:
 					try:
-						client.send(msg)
-						print("sent message to client")
+						sentBytes = client.send(bytes(msg,'UTF-8'))
+						print("sent %d bytes to client: %s" % (sentBytes,msg))
 					except:
 						client.close()
 						clients.remove(client)
@@ -29,7 +26,7 @@ serverSocket.bind(('localhost',serverPort))
 serverSocket.listen(1)
 clients.append(serverSocket)
 
-print 'The server is ready to receive.\n'
+print('The server is ready to receive.\n')
 
 while 1:
 	readableSockets, writeableSockets, errorSockets = select.select(clients, [], [])
@@ -43,13 +40,16 @@ while 1:
 			#socketToRead must be connected to existing client
 			else:
 				try:
-					clientMsg, clientAddr = socketToRead.recvfrom(2048)
-					print("received client message: %s") %clientMsg
-					distributeMsg(socketToRead,clientMsg)
-				except socket.error, msg:
-					print("Error %s") %os.strerror(msg[0])
+					clientMsgBytes = socketToRead.recv(2048)
+					clientMsg = clientMsgBytes.decode('utf-8')
+					if not clientMsg:
+							socketToRead.close()
+							clients.remove(socketToRead)
+					#confirm receipt and construct message to be broadcasted
+					else:
+							print("received client message: %s" % clientMsg)
+							distributeMsg(socketToRead,clientMsg)
+				except OSError as e:
+					print(e)
 					socketToRead.close()
 					clients.remove(socket)
-
-connectionSocket.close()
-
